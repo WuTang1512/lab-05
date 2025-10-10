@@ -2,6 +2,7 @@ package com.example.lab5_starter;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
@@ -25,10 +26,13 @@ public class MainActivity extends AppCompatActivity implements CityDialogFragmen
     private ListView cityListView;
 
     private ArrayList<City> cityArrayList;
-    private ArrayAdapter<City> cityArrayAdapter;
+    private CityArrayAdapter cityArrayAdapter;
 
     private FirebaseFirestore db;
     private CollectionReference citiesRef;
+    private Button editListButton;
+    private Button deleteButton;
+    private boolean isEditMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,11 +48,15 @@ public class MainActivity extends AppCompatActivity implements CityDialogFragmen
         // Set views
         addCityButton = findViewById(R.id.buttonAddCity);
         cityListView = findViewById(R.id.listviewCities);
+        editListButton = findViewById(R.id.buttonEditList); // added in for my implementation of deleting with checkboxes
+        deleteButton = findViewById(R.id.buttonDelete);
 
         // create city array
         cityArrayList = new ArrayList<>();
-        cityArrayAdapter = new CityArrayAdapter(this, cityArrayList);
+        cityArrayAdapter = new CityArrayAdapter(this, cityArrayList, isEditMode);
         cityListView.setAdapter(cityArrayAdapter);
+
+        deleteButton.setVisibility(View.GONE);
 
 //        addDummyData();
 
@@ -59,10 +67,16 @@ public class MainActivity extends AppCompatActivity implements CityDialogFragmen
         });
 
         cityListView.setOnItemClickListener((adapterView, view, i, l) -> {
-            City city = cityArrayAdapter.getItem(i);
-            CityDialogFragment cityDialogFragment = CityDialogFragment.newInstance(city);
-            cityDialogFragment.show(getSupportFragmentManager(), "City Details");
+            if (!isEditMode){
+                City city = cityArrayAdapter.getItem(i);
+                CityDialogFragment cityDialogFragment = CityDialogFragment.newInstance(city);
+                cityDialogFragment.show(getSupportFragmentManager(), "City Details");
+            }
         });
+
+        editListButton.setOnClickListener(view -> toggleEditMode());
+        deleteButton.setOnClickListener(view -> deleteCheckedItems());
+
         db = FirebaseFirestore.getInstance();
         citiesRef = db.collection("cities");
 
@@ -83,11 +97,47 @@ public class MainActivity extends AppCompatActivity implements CityDialogFragmen
         });
     }
 
+    private void toggleEditMode() {
+        isEditMode = !isEditMode;
+        editListButton.setText(isEditMode ? "Done" : "Edit List");
+        deleteButton.setVisibility(isEditMode ? View.VISIBLE : View.GONE);
+        addCityButton.setVisibility(isEditMode ? View.GONE : View.VISIBLE);
+        
+        cityArrayAdapter.setEditMode(isEditMode);
+        cityArrayAdapter.notifyDataSetChanged();
+    }
+    
+    private void deleteCheckedItems() {
+        ArrayList<City> citiesToDelete = new ArrayList<>();
+        for (City city : cityArrayList) {
+            if (city.isChecked()) {
+                citiesToDelete.add(city);
+            }
+        }
+        
+        if (citiesToDelete.isEmpty()) {
+            return;
+        }
+        
+        for (City city : citiesToDelete) {
+            cityArrayList.remove(city);
+            citiesRef.document(city.getName()).delete()
+                    .addOnSuccessListener(aVoid -> Log.d("Firestore", "successful delete of document with ID: " + city.getName()))
+                    .addOnFailureListener(e -> Log.w("Firestore", "Error deleting document with ID: " + city.getName() + ", error: " + e));
+        }
+        toggleEditMode();
+    }
+
     @Override
     public void updateCity(City city, String title, String year) {
+        citiesRef.document(city.getName()).delete();
+        
         city.setName(title);
         city.setProvince(year);
         cityArrayAdapter.notifyDataSetChanged();
+        
+        DocumentReference docRef = citiesRef.document(city.getName());
+        docRef.set(city);
 
         // Updating the database using delete + addition
     }

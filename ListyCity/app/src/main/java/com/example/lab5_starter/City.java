@@ -8,6 +8,7 @@ public class City implements Serializable {
     // attributes
     private String name;
     private String province;
+    private boolean isChecked = false;
 
     // constructor
     public City(String name, String province) {
@@ -29,5 +30,11 @@ public class City implements Serializable {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public boolean isChecked() { // new getter for implementing checkboxes for deleting
+        return isChecked;}
+    public void setChecked(boolean checked) { // new setter for implementing checkboxes for deleting
+        isChecked = checked;
     }
 }
